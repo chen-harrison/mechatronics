@@ -66,8 +66,10 @@ int main() {
         }
         else if(PORTBbits.RB4 == 1){
             _CP0_SET_COUNT(0);
-            while(_CP0_GET_COUNT < 2000){ ; }
-            LATAINV = 0b00001;
+            while(_CP0_GET_COUNT() < 12000){ ; }
+            LATAINV = 0b10000;
         }
     }
+    
+    return 0;
 }
