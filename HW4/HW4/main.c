@@ -2,6 +2,8 @@
 #include <sys/attribs.h>  // __ISR macro
 #include "NU32.h"
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 // DEVCFG0
 #pragma config DEBUG = OFF // no debugging
@@ -38,7 +40,11 @@
 #pragma config FUSBIDIO = ON // USB pins controlled by USB module
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
+#define CS LATBbits.LATB3
+
 void initSPI1(void);
+unsigned char spi_io(unsigned char o);
+void setVoltage(char channel, int voltage);
 
 int main() {
     __builtin_disable_interrupts();
@@ -62,23 +68,42 @@ int main() {
 
     __builtin_enable_interrupts();
 
+    int i = 0;
+    int VoutA, VoutB;
+    
     while(1) {
 	// use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
 	// remember the core timer runs at half the sysclk
         if(PORTBbits.RB4 == 0){
-            LATAbits.LATA4 = 0;
+            VoutA = 0;
+            VoutB = 0;
+            
+            setVoltage(0,VoutA);
+            setVoltage(1,VoutB);
         }
         else if(PORTBbits.RB4 == 1){
             _CP0_SET_COUNT(0);
+            
+            if(i <= 100){
+                VoutA = (i/100) * 1024;
+            }
+            else if(i > 100){
+                VoutA = ((200-i)/100) * 1024;
+            }
+            
+            VoutB = (cos(20*M_PI*i/100)+1)/2 * 1024;
+            
+            if(i >= 199){
+                i = 0;
+            }
+            else if(i < 199){
+                i++;
+            }    
             while(_CP0_GET_COUNT() < 12000){ ; }
-            LATAINV = 0b10000;
+            
+            setVoltage(0,VoutA);
+            setVoltage(1,VoutB);
         }
-        
-        /*
-         float f = 512 + 512*sin(i*2*3.14/1000*10)
-         i++;
-         
-         */
     }
     
     return 0;
@@ -86,13 +111,9 @@ int main() {
 
 
 void initSPI1(void){
-    TRISBbits.TRISB8 = 0;
+    TRISBbits.TRISB3 = 0;
     CS = 1;
 
-  // Master - SPI4, pins are: SDI4(F4), SDO4(F5), SCK4(F13).  
-  // we manually control SS4 as a digital output (F12)
-  // since the pic is just starting, we know that spi is off. We rely on defaults here
- 
   // setup SPI1
     SPI1CON = 0;                // turn off the spi module and reset it
     SPI1BUF;                    // clear the rx buffer by reading from it
@@ -108,7 +129,24 @@ void initSPI1(void){
     SDI1bits.SDI1R = 0b0100;    // SDI1 = RPB8 (pin 17)
                                 // SCK1 = RPB14 (pin 25)
     
-    
     SPI1CONbits.ON = 1;         // turn on SPI1
+    
+}
 
+unsigned char spi_io(unsigned char o){
+    SPI1BUF = o;
+    while(!SPI1STATbits.SPIRBF) { ; }
+    return SPI1BUF;
+}
+
+
+void setVoltage(char a, int v){
+    unsigned short t = 0; 
+    t= a << 15;                         // a is at the very end of the data transfer
+	t = t | 0b01110000000000000;
+	t = t | ((v & 0b1111111111) << 2);  // add integer, shift up 2, scrap the rest
+	
+	CS = 0;
+	spi_io(t >> 8); // add 8 zeros on left end to convert from short to char
+    CS = 1;
 }
