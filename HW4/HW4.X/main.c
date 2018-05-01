@@ -40,7 +40,7 @@
 #pragma config FUSBIDIO = ON // USB pins controlled by USB module
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
-#define CS LATBbits.LATB3
+#define CS LATBbits.LATB7
 
 void initSPI1(void);
 unsigned char spi_io(unsigned char o);
@@ -67,7 +67,8 @@ int main() {
     TRISBbits.TRISB4 = 1;
 
     __builtin_enable_interrupts();
-
+    
+    initSPI1();
     int i = 0;
     int VoutA, VoutB;
     
@@ -85,10 +86,10 @@ int main() {
             _CP0_SET_COUNT(0);
             
             if(i <= 100){
-                VoutA = (i/100) * 1024;
+                VoutA = i * 1024/100;
             }
             else if(i > 100){
-                VoutA = ((200-i)/100) * 1024;
+                VoutA = (200-i) * 1024/100;
             }
             
             VoutB = (cos(20*M_PI*i/100)+1)/2 * 1024;
@@ -99,7 +100,7 @@ int main() {
             else if(i < 199){
                 i++;
             }    
-            while(_CP0_GET_COUNT() < 12000){ ; }
+            while(_CP0_GET_COUNT() < 24000){ ; }
             
             setVoltage(0,VoutA);
             setVoltage(1,VoutB);
@@ -111,22 +112,22 @@ int main() {
 
 
 void initSPI1(void){
-    TRISBbits.TRISB3 = 0;
+    TRISBbits.TRISB7 = 0;
     CS = 1;
 
   // setup SPI1
     SPI1CON = 0;                // turn off the spi module and reset it
     SPI1BUF;                    // clear the rx buffer by reading from it
-    SPI1BRG = 0x1;              // baud rate to 10 MHz [SPI4BRG = (80000000/(2*desired))-1]
+    SPI1BRG = 0b001111101000;   // baud rate to 10 MHz [SPI4BRG = (80000000/(2*desired))-1]
     SPI1STATbits.SPIROV = 0;    // clear the overflow bit
     SPI1CONbits.CKE = 0;        // data changes when clock goes from low to high
     SPI1CONbits.MSTEN = 1;      // master operation
  
     // CFGCONbits.IOLOCK = 0;   
-    RPB7bits.RPB7R = 0b0011;    // SS1 = RPB7 (pin 16)
-    RPA1bits.RPA1R = 0b0011;    // SDO1 = RPA1 (pin 3)
+    RPB7Rbits.RPB7R = 0b0011;    // SS1 = RPB7 (pin 16)
+    RPA1Rbits.RPA1R = 0b0011;    // SDO1 = RPA1 (pin 3)
     TRISBbits.TRISB8 = 1;
-    SDI1bits.SDI1R = 0b0100;    // SDI1 = RPB8 (pin 17)
+    SDI1Rbits.SDI1R = 0b0100;    // SDI1 = RPB8 (pin 17)
                                 // SCK1 = RPB14 (pin 25)
     
     SPI1CONbits.ON = 1;         // turn on SPI1
@@ -148,5 +149,6 @@ void setVoltage(char a, int v){
 	
 	CS = 0;
 	spi_io(t >> 8); // add 8 zeros on left end to convert from short to char
+    spi_io(t);
     CS = 1;
 }

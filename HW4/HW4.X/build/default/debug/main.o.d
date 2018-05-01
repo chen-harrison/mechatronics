@@ -1,2 +1,3 @@
 build/default/debug/main.o:  \
-main.c 
+main.c  \
+NU32.h 
