@@ -69,8 +69,20 @@ int main() {
     __builtin_enable_interrupts();
     
     initSPI1();
-    int i = 0;
+    int i = 0, j;
+    int sine[200], triangle[200];
     int VoutA, VoutB;
+    
+    for(j=0; j<=199; j++){
+        if(j <= 100){
+                triangle[j] = j * 10.24;
+            }
+        else if(j > 100){
+            triangle[j] = (200-j) * 10.24;
+            }
+        
+        sine[j] = (cos(20*M_PI*i/100)+1)/2 * 1024;
+    }
     
     while(1) {
 	// use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
@@ -85,20 +97,14 @@ int main() {
         else if(PORTBbits.RB4 == 1){
             _CP0_SET_COUNT(0);
             
-            if(i <= 100){
-                VoutA = i * 1024/100;
-            }
-            else if(i > 100){
-                VoutA = (200-i) * 1024/100;
-            }
+            VoutA = sine[i];
+            VoutB = triangle[i];
             
-            VoutB = (cos(20*M_PI*i/100)+1)/2 * 1024;
-            
-            if(i >= 199){
-                i = 0;
-            }
-            else if(i < 199){
+            if(i < 199){
                 i++;
+            }
+            else if(i >= 199){
+                i = 0;
             }    
             while(_CP0_GET_COUNT() < 24000){ ; }
             
@@ -118,7 +124,7 @@ void initSPI1(void){
   // setup SPI1
     SPI1CON = 0;                // turn off the spi module and reset it
     SPI1BUF;                    // clear the rx buffer by reading from it
-    SPI1BRG = 0b001111101000;   // baud rate to 10 MHz [SPI4BRG = (80000000/(2*desired))-1]
+    SPI1BRG = 500;             // baud rate to 10 MHz [SPI4BRG = (80000000/(2*desired))-1]
     SPI1STATbits.SPIROV = 0;    // clear the overflow bit
     SPI1CONbits.CKE = 0;        // data changes when clock goes from low to high
     SPI1CONbits.MSTEN = 1;      // master operation
@@ -144,7 +150,7 @@ unsigned char spi_io(unsigned char o){
 void setVoltage(char a, int v){
     unsigned short t = 0; 
     t= a << 15;                         // a is at the very end of the data transfer
-	t = t | 0b01110000000000000;
+	t = t | 0b0111000000000000;         // removed a 0 at the end, so 16 bits
 	t = t | ((v & 0b1111111111) << 2);  // add integer, shift up 2, scrap the rest
 	
 	CS = 0;
