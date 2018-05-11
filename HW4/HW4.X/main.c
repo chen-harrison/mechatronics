@@ -44,7 +44,7 @@
 
 void initSPI1(void);
 unsigned char spi_io(unsigned char o);
-void setVoltage(char channel, int voltage);
+void setVoltage(unsigned char channel, int voltage);
 
 int main() {
     __builtin_disable_interrupts();
@@ -70,9 +70,10 @@ int main() {
     
     initSPI1();
     int i = 0, j;
+    
     int sine[200], triangle[200];
     int VoutA, VoutB;
-    
+    /*
     for(j=0; j<=199; j++){
         if(j <= 100){
                 triangle[j] = j * 10.24;
@@ -83,6 +84,9 @@ int main() {
         
         sine[j] = (cos(20*M_PI*i/100)+1)/2 * 1024;
     }
+    */
+    
+    int square[4] = {1023,0, 1023, 0};
     
     while(1) {
 	// use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
@@ -96,7 +100,7 @@ int main() {
         }
         else if(PORTBbits.RB4 == 1){
             _CP0_SET_COUNT(0);
-            
+            /*
             VoutA = sine[i];
             VoutB = triangle[i];
             
@@ -105,11 +109,23 @@ int main() {
             }
             else if(i >= 199){
                 i = 0;
-            }    
-            while(_CP0_GET_COUNT() < 24000){ ; }
+            }
+            */
+            VoutA = square[i];
+            
+            if(i < 3){
+                i++;
+            }
+            else if(i >= 3){
+                i = 0;
+            }
             
             setVoltage(0,VoutA);
-            setVoltage(1,VoutB);
+            
+            while(_CP0_GET_COUNT() < 24000){ ; }
+            
+            
+            // setVoltage(1,VoutB);
         }
     }
     
@@ -124,7 +140,7 @@ void initSPI1(void){
   // setup SPI1
     SPI1CON = 0;                // turn off the spi module and reset it
     SPI1BUF;                    // clear the rx buffer by reading from it
-    SPI1BRG = 500;             // baud rate to 10 MHz [SPI4BRG = (80000000/(2*desired))-1]
+    SPI1BRG = 100;             // baud rate to 10 MHz [SPI4BRG = (24000000/(2*desired))-1]
     SPI1STATbits.SPIROV = 0;    // clear the overflow bit
     SPI1CONbits.CKE = 0;        // data changes when clock goes from low to high
     SPI1CONbits.MSTEN = 1;      // master operation
@@ -147,7 +163,7 @@ unsigned char spi_io(unsigned char o){
 }
 
 
-void setVoltage(char a, int v){
+void setVoltage(unsigned char a, int v){
     unsigned short t = 0; 
     t= a << 15;                         // a is at the very end of the data transfer
 	t = t | 0b0111000000000000;         // removed a 0 at the end, so 16 bits
