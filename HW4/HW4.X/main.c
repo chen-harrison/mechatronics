@@ -73,7 +73,7 @@ int main() {
     
     int sine[200], triangle[200];
     int VoutA, VoutB;
-    /*
+    
     for(j=0; j<=199; j++){
         if(j <= 100){
                 triangle[j] = j * 10.24;
@@ -84,10 +84,7 @@ int main() {
         
         sine[j] = (cos(20*M_PI*i/100)+1)/2 * 1024;
     }
-    */
-    
-    int square[4] = {1023,0, 1023, 0};
-    
+        
     while(1) {
 	// use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
 	// remember the core timer runs at half the sysclk
@@ -100,7 +97,7 @@ int main() {
         }
         else if(PORTBbits.RB4 == 1){
             _CP0_SET_COUNT(0);
-            /*
+            
             VoutA = sine[i];
             VoutB = triangle[i];
             
@@ -110,22 +107,11 @@ int main() {
             else if(i >= 199){
                 i = 0;
             }
-            */
-            VoutA = square[i];
-            
-            if(i < 3){
-                i++;
-            }
-            else if(i >= 3){
-                i = 0;
-            }
             
             setVoltage(0,VoutA);
+            setVoltage(1,VoutB);
             
             while(_CP0_GET_COUNT() < 24000){ ; }
-            
-            
-            // setVoltage(1,VoutB);
         }
     }
     
@@ -140,7 +126,7 @@ void initSPI1(void){
   // setup SPI1
     SPI1CON = 0;                // turn off the spi module and reset it
     SPI1BUF;                    // clear the rx buffer by reading from it
-    SPI1BRG = 100;             // baud rate to 10 MHz [SPI4BRG = (24000000/(2*desired))-1]
+    SPI1BRG = 1000;             // baud rate to 10 MHz [SPI4BRG = (24000000/(2*desired))-1]
     SPI1STATbits.SPIROV = 0;    // clear the overflow bit
     SPI1CONbits.CKE = 0;        // data changes when clock goes from low to high
     SPI1CONbits.MSTEN = 1;      // master operation
