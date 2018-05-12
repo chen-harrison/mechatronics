@@ -151,7 +151,7 @@ unsigned char spi_io(unsigned char o){
 
 void setVoltage(unsigned char a, int v){
     unsigned short t = 0; 
-    t= a << 15;                         // a is at the very end of the data transfer
+    t = a << 15;                         // a is at the very end of the data transfer
 	t = t | 0b0111000000000000;         // removed a 0 at the end, so 16 bits
 	t = t | ((v & 0b1111111111) << 2);  // add integer, shift up 2, scrap the rest
 	
