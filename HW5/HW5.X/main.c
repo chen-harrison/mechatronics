@@ -81,7 +81,7 @@ void initExpander(void){
     i2c_master_start();             // set outputs at pins 0-3
     i2c_master_send(0b01001110);    // write bit 0
     i2c_master_send(0x0A);          // OLAT register
-    i2c_master_send(0x0F);
+    i2c_master_send(0x0F);          // set outputs high to start
     i2c_master_stop();
 }
 
@@ -104,9 +104,13 @@ void setExpander(char pin, char level){
         write = (write | change);   // set desired pin high
     }
     else if(!level){
+        write = write & (~change);
+        
+        /*
         write = ~write;             // invert existing outputs
         write = (write | change);   // set the inverted bit to 1
         write = ~write;             // invert it again to set it to 0
+        */
     }
     
     i2c_master_start();             // read input pins
