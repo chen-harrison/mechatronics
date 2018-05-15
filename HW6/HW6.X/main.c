@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ST7735.h"
+#include <xc.h>
 
 // DEVCFG0
 #pragma config DEBUG = OFF // no debugging
@@ -38,11 +39,48 @@
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
 void printLetter(char letter, unsigned short x, unsigned short y, unsigned short print, unsigned short background);
+void emptyBar(void);
 
 int main(){
+    int count, i, k, j = 0;
+    float fps;
+    char progress[20], speed[20];
+    
     LCD_init();
-    LCD_clearScreen(RED);
-    printLetter('a',30,40, BLACK, RED);
+    LCD_clearScreen(BLACK);
+    emptyBar();
+    
+    while(1){
+        emptyBar();     
+        for(i = 1; i <= 100; i++){                  // 0 to 100 increment loop
+            _CP0_SET_COUNT(0);
+            
+            sprintf(progress,"Hello world %d!  ",i);  // create corresponding text
+            
+            while(progress[j]){                     // write word out
+                printLetter(progress[j], (28 + 5*j), 32, WHITE, BLACK);
+                j++;
+            }
+            j = 0;                                  // set start point back
+            
+            for(k = 0; k <= 4; k++){
+                LCD_drawPixel((14+i), (42+k), GREEN);
+            }
+            
+            count = _CP0_GET_COUNT();
+            fps = 24000000.0 / count;
+            
+            sprintf(speed,"FPS = %5.2f",fps);
+            
+            while(speed[j]){                        // write word out
+                printLetter(speed[j], (15 + 5*j), 100, WHITE, BLACK);
+                j++;
+            }
+            j = 0; 
+            
+            while(_CP0_GET_COUNT() < 2400000){ ; }
+        }
+    }
 
     return 0;
 }
@@ -66,6 +104,15 @@ void printLetter(char letter, unsigned short x, unsigned short y, unsigned short
                     LCD_drawPixel(x+i, y+j, background);
                 }
             }
+        }
+    }
+}
+
+void emptyBar(void){
+    int i,j;
+    for(i = 1; i <= 100; i++){
+        for(j = 0; j <= 4; j++){
+                LCD_drawPixel((14+i), (42+j), WHITE);
         }
     }
 }
