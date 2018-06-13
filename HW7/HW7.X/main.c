@@ -44,7 +44,72 @@ void I2C_read_multiple(unsigned char address, unsigned char register, unsigned c
 
 
 int main(void){
+    __builtin_disable_interrupts();
+
+    // set the CP0 CONFIG register to indicate that kseg0 is cacheable (0x3)
+    __builtin_mtc0(_CP0_CONFIG, _CP0_CONFIG_SELECT, 0xa4210583);
+
+    // 0 data RAM access wait states
+    BMXCONbits.BMXWSDRM = 0x0;
+
+    // enable multi vector interrupts
+    INTCONbits.MVEC = 0x1;
+
+    // disable JTAG to get pins back
+    DDPCONbits.JTAGEN = 0;
+
+    // do your TRIS and LAT commands here
+    TRISAbits.TRISA4 = 0;               // set LED pin to output
+    LATAbits.LATA4 = 1;                 // turning on LED
+    TRISBbits.TRISB4 = 1;               // set pushbutton pin to input
+
+    __builtin_enable_interrupts();
+
     initIMU();
+    unsigned char address = 0b11010110;     // device opcode with write bit 0
+    unsigned char register = 0x20;          // OUT_TEMP_L
+    int length = 14;                        // array length
+    unsigned char data[length];             // storage array
+    short temperature, gyroX, gyro Y, gyroZ, accelX, accelY, accelZ;
+    
+    //WHO_AM_I check
+    
+    i2c_master_start();             // check WHO_AM_I
+    i2c_master_send(0b11010110);    // write bit 0
+    i2c_master_send(0x0F);          // WHO_AM_I register
+    i2c_master_restart();
+    i2c_master_send(0b11010111);    // read bit 1
+    char read = i2c_master_recv();  // receive from slave
+    i2c_master_stop();
+    
+    if(read != 0b01101001){
+        LATAbits.LATA4 = 0;
+        while(1){ ; }
+    }
+    
+    while(1) {
+	// use _CP0_SET_COUNT(0) and _CP0_GET_COUNT() to test the PIC timing
+	// remember the core timer runs at half the sysclk
+        if(PORTBbits.RB4 == 0){
+            LATAbits.LATA4 = 0;
+        }
+        else if(PORTBbits.RB4 == 1){
+            _CP0_SET_COUNT(0);
+            
+            I2C_read_multiple(address, register, data, length);
+            
+            temperature = (data[0] << 8) | (data[1]);  // if not, try (data[1] | 0b0000000000000000)
+            gyroX = (data[2] << 8) | (data[3]);
+            gyroY = (data[4] << 8) | (data[5]);
+            gyroZ = (data[6] << 8) | (data[7]);
+            accelX = (data[8] << 8) | (data[9]);
+            accelY = (data[10] << 8) | (data[11]);
+            accelZ = (data[12] << 8) | (data[13]);
+            
+            while(_CP0_GET_COUNT() < 2400000){ ; }  // 20 Hz
+            LATAINV = 0b10000;
+        }
+    }
     return 0;
 }
 
@@ -78,37 +143,27 @@ void initIMU(void){
     i2c_master_stop();   
 }
 
-char getExpander(void){
-    i2c_master_start();             // read input pins
-    i2c_master_send(0b01001110);    // write bit 0
-    i2c_master_send(0x09);          // GPIO register
+void I2C_read_multiple(unsigned char address, unsigned char register, unsigned char * data, int length){
+    int i;
+    
+    // add the address with write bit 0, then when reading, OR it with 0b00000001
+    
+    i2c_master_start();
+    i2c_master_send(address);           // write bit 0
+    i2c_master_send(register);          // GPIO register
     i2c_master_restart();
-    i2c_master_send(0b01001111);    // read bit 1
-    char read = i2c_master_recv();  // receive from slave
-    i2c_master_stop();
+    i2c_master_send(address | 0x01);    // read bit 1
     
-    return read;
-}
-
-void setExpander(char pin, char level){
-    char write = getExpander();     // existing outputs
-    char change = 1 << pin;         // 1 at the desired pin bit
-    if(level){
-        write = (write | change);   // set desired pin high
-    }
-    else if(!level){
-        write = write & (~change);
+    for(i = 0; i <= (length-1); i++){
         
-        /*
-        write = ~write;             // invert existing outputs
-        write = (write | change);   // set the inverted bit to 1
-        write = ~write;             // invert it again to set it to 0
-        */
+        data[i] = i2c_master_recv();  // also can try *(data + 1)
+        
+        if(i < (length-1)){
+            i2c_master_ack(0);
+        }
+        else{
+            i2c_master_ack(1);
+            i2c_master_stop();
+        }
     }
-    
-    i2c_master_start();             // read input pins
-    i2c_master_send(0b01001110);    // write bit 0
-    i2c_master_send(0x0A);          // OLAT register
-    i2c_master_send(write);         // set the outputs to new byte
-    i2c_master_stop();
 }
