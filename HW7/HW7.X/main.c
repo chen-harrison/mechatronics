@@ -40,7 +40,8 @@
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
 void initIMU(void);
-void I2C_read_multiple(unsigned char address, unsigned char register, unsigned char * data, int length);
+void I2C_read_multiple(unsigned char address, unsigned char reg, unsigned char * data, int length);
+void printLetter(char letter, unsigned short x, unsigned short y, unsigned short print, unsigned short background);
 
 
 int main(void){
@@ -67,10 +68,15 @@ int main(void){
 
     initIMU();
     unsigned char address = 0b11010110;     // device opcode with write bit 0
-    unsigned char register = 0x20;          // OUT_TEMP_L
+    unsigned char reg = 0x20;               // OUT_TEMP_L
     int length = 14;                        // array length
     unsigned char data[length];             // storage array
-    short temperature, gyroX, gyro Y, gyroZ, accelX, accelY, accelZ;
+    signed short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
+    short endX, endY;
+    char statusX[20], statusY[20];
+    
+    LCD_init();
+    LCD_clearScreen(BLACK);
     
     //WHO_AM_I check
     
@@ -84,7 +90,20 @@ int main(void){
     
     if(read != 0b01101001){
         LATAbits.LATA4 = 0;
-        while(1){ ; }
+        while(1){ ; }               // black LCD if not done correctly
+    }
+    
+    int x,y,i,j = 0;
+    for(x = 1; x <= 128; x++){
+        for(y = 77; y <= 83; y++){
+                LCD_drawPixel(x,y, BLUE);
+        }
+    }
+    
+    for(x = 61; x <= 67; x++){
+        for(y = 1; y <= 160; y++){
+                LCD_drawPixel(x,y, BLUE);
+        }
     }
     
     while(1) {
@@ -96,20 +115,67 @@ int main(void){
         else if(PORTBbits.RB4 == 1){
             _CP0_SET_COUNT(0);
             
-            I2C_read_multiple(address, register, data, length);
+            I2C_read_multiple(address, reg, data, length);
             
-            temperature = (data[0] << 8) | (data[1]);  // if not, try (data[1] | 0b0000000000000000)
-            gyroX = (data[2] << 8) | (data[3]);
-            gyroY = (data[4] << 8) | (data[5]);
+            temperature = (data[0] << 8) | (data[1] | 0b0000000000000000);  // if not, try (data[1] | 0b0000000000000000)
+            gyroX = (data[2] << 8) | (data[3] | 0b0000000000000000);
+            gyroY = (data[4] << 8) | (data[5] | 0b0000000000000000);
             gyroZ = (data[6] << 8) | (data[7]);
             accelX = (data[8] << 8) | (data[9]);
             accelY = (data[10] << 8) | (data[11]);
             accelZ = (data[12] << 8) | (data[13]);
             
+            sprintf(statusX,"accelX = %hi",accelX);
+            sprintf(statusY,"accelY = %hi",accelY);
+            
+            while(statusX[j]){                     // write word out
+                printLetter(statusX[j], (5 + 5*j), 5, WHITE, BLACK);
+                j++;
+            }
+            
+            j = 0;
+            
+            while(statusY[j]){                     // write word out
+                printLetter(statusY[j], (5 + 5*j), 12, WHITE, BLACK);
+                j++;
+            }
+            
+            j = 0;
+            
+            /*
+            endX = 64 + gyroX;
+            endY = 80 + gyroY;
+            
+            for(x = 61; x <= 67; x++){
+                for(y = 1; y <= 160; y++){
+                    if((y < endY && y > 80) || (y > endY && y < 80)){
+                        LCD_drawPixel(x,y, WHITE);
+                    }
+                    else{
+                        LCD_drawPixel(x,y, BLUE);
+                    }
+                    
+                }
+            }
+            
+            for(y = 77; y <= 83; y++){
+                for(x = 1; x <= 128; x++){
+                    if((x < endX && x > 64) || (x > endX && x < 64)){
+                        LCD_drawPixel(x,y, WHITE);
+                    }
+                    else{
+                        LCD_drawPixel(x,y, BLUE);
+                    }
+                    LCD_drawPixel(x,y, BLUE);
+                }
+            }
+            */
+            
             while(_CP0_GET_COUNT() < 2400000){ ; }  // 20 Hz
             LATAINV = 0b10000;
         }
     }
+    
     return 0;
 }
 
@@ -143,14 +209,14 @@ void initIMU(void){
     i2c_master_stop();   
 }
 
-void I2C_read_multiple(unsigned char address, unsigned char register, unsigned char * data, int length){
+void I2C_read_multiple(unsigned char address, unsigned char reg, unsigned char * data, int length){
     int i;
     
     // add the address with write bit 0, then when reading, OR it with 0b00000001
     
     i2c_master_start();
     i2c_master_send(address);           // write bit 0
-    i2c_master_send(register);          // GPIO register
+    i2c_master_send(reg);               // OUT_TEMP_L
     i2c_master_restart();
     i2c_master_send(address | 0x01);    // read bit 1
     
@@ -164,6 +230,29 @@ void I2C_read_multiple(unsigned char address, unsigned char register, unsigned c
         else{
             i2c_master_ack(1);
             i2c_master_stop();
+        }
+    }
+}
+
+void printLetter(char letter, unsigned short x, unsigned short y, unsigned short print, unsigned short background){ // add draw color, background color
+    if(x >= 124 || y >= 156){ ; }
+    else{
+        char column, pixel;
+        short i,j;
+        
+        for(i = 0; i <= 4; i++){
+            char column = ASCII[letter - 32][i];
+            
+            for(j = 0; j <= 7; j++){
+                pixel = ((column >> j) & 0x01);
+                
+                if(pixel){
+                    LCD_drawPixel(x+i, y+j, print);
+                }
+                else if(!pixel){
+                    LCD_drawPixel(x+i, y+j, background);
+                }
+            }
         }
     }
 }
