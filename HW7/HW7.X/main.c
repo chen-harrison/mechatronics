@@ -39,13 +39,43 @@
 #pragma config FUSBIDIO = ON // USB pins controlled by USB module
 #pragma config FVBUSONIO = ON // USB BUSON controlled by USB module
 
-char getExpander(void);
-void setExpander(char pin, char level);
+void initIMU(void);
+void I2C_read_multiple(unsigned char address, unsigned char register, unsigned char * data, int length);
 
 
 int main(void){
-
+    initIMU();
     return 0;
+}
+
+void initIMU(void){
+    ANSELBbits.ANSB2 = 0;       // SDA2 pin is digital
+    ANSELBbits.ANSB3 = 0;       // SCL2 pin is digital
+    i2c_master_setup();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x10);          // CTRL1_XL address
+    i2c_master_send(0b10000010);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x11);          // CTRL2_G address
+    i2c_master_send(0b10001000);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x12);          // CTRL3_C address
+    i2c_master_send(0b00000100);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x13);          // CTRL4_C address
+    i2c_master_send(0b10000000);    // info bit
+    i2c_master_stop();   
 }
 
 char getExpander(void){
