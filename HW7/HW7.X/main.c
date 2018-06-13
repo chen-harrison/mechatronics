@@ -117,16 +117,16 @@ int main(void){
             
             I2C_read_multiple(address, reg, data, length);
             
-            temperature = (data[0] << 8) | (data[1] | 0b0000000000000000);  // if not, try (data[1] | 0b0000000000000000)
-            gyroX = (data[2] << 8) | (data[3] | 0b0000000000000000);
-            gyroY = (data[4] << 8) | (data[5] | 0b0000000000000000);
-            gyroZ = (data[6] << 8) | (data[7]);
-            accelX = (data[8] << 8) | (data[9]);
-            accelY = (data[10] << 8) | (data[11]);
-            accelZ = (data[12] << 8) | (data[13]);
+            temperature = (data[1] << 8) | (data[0] | 0b0000000000000000);  // if not, try (data[1] | 0b0000000000000000)
+            gyroX = (data[3] << 8) | (data[2] | 0b0000000000000000);
+            gyroY = (data[5] << 8) | (data[4] | 0b0000000000000000);
+            gyroZ = (data[7] << 8) | (data[6] | 0b0000000000000000);
+            accelX = (data[9] << 8) | (data[8] | 0b0000000000000000);
+            accelY = (data[11] << 8) | (data[10] | 0b0000000000000000);
+            accelZ = (data[13] << 8) | (data[12] | 0b0000000000000000);
             
-            sprintf(statusX,"accelX = %hi",accelX);
-            sprintf(statusY,"accelY = %hi",accelY);
+            sprintf(statusX,"x = %hi",accelX);
+            sprintf(statusY,"y = %hi",accelY);
             
             while(statusX[j]){                     // write word out
                 printLetter(statusX[j], (5 + 5*j), 5, WHITE, BLACK);
@@ -142,9 +142,9 @@ int main(void){
             
             j = 0;
             
-            /*
-            endX = 64 + gyroX;
-            endY = 80 + gyroY;
+            
+            endX = 64 + (accelX/50);
+            endY = 80 + (accelY/100);
             
             for(x = 61; x <= 67; x++){
                 for(y = 1; y <= 160; y++){
@@ -154,7 +154,6 @@ int main(void){
                     else{
                         LCD_drawPixel(x,y, BLUE);
                     }
-                    
                 }
             }
             
@@ -166,10 +165,14 @@ int main(void){
                     else{
                         LCD_drawPixel(x,y, BLUE);
                     }
-                    LCD_drawPixel(x,y, BLUE);
                 }
             }
-            */
+            
+            for(x = 61; x <= 67; x++){
+                for(y = 77; y <= 83; y++){
+                    LCD_drawPixel(x,y, WHITE);
+                }
+            }
             
             while(_CP0_GET_COUNT() < 2400000){ ; }  // 20 Hz
             LATAINV = 0b10000;
