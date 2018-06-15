@@ -54,6 +54,8 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 // *****************************************************************************
 
 #include "app.h"
+#include "ST7735.h"
+#include "i2c_master_noint.h"
 
 // *****************************************************************************
 // *****************************************************************************
@@ -97,6 +99,83 @@ APP_DATA appData;
 /* TODO:  Add any necessary local functions.
 */
 
+void initIMU(void){
+    ANSELBbits.ANSB2 = 0;       // SDA2 pin is digital
+    ANSELBbits.ANSB3 = 0;       // SCL2 pin is digital
+    i2c_master_setup();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x10);          // CTRL1_XL address
+    i2c_master_send(0b10000010);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x11);          // CTRL2_G address
+    i2c_master_send(0b10001000);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x12);          // CTRL3_C address
+    i2c_master_send(0b00000100);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x13);          // CTRL4_C address
+    i2c_master_send(0b10000000);    // info bit
+    i2c_master_stop();   
+}
+
+void I2C_read_multiple(unsigned char address, unsigned char reg, unsigned char * data, int length){
+    int i;
+    
+    // add the address with write bit 0, then when reading, OR it with 0b00000001
+    
+    i2c_master_start();
+    i2c_master_send(address);           // write bit 0
+    i2c_master_send(reg);               // OUT_TEMP_L
+    i2c_master_restart();
+    i2c_master_send(address | 0x01);    // read bit 1
+    
+    for(i = 0; i <= (length-1); i++){
+        
+        data[i] = i2c_master_recv();  // also can try *(data + 1)
+        
+        if(i < (length-1)){
+            i2c_master_ack(0);
+        }
+        else{
+            i2c_master_ack(1);
+            i2c_master_stop();
+        }
+    }
+}
+
+void printLetter(char letter, unsigned short x, unsigned short y, unsigned short print, unsigned short background){ // add draw color, background color
+    if(x >= 124 || y >= 156){ ; }
+    else{
+        char column, pixel;
+        short i,j;
+        
+        for(i = 0; i <= 4; i++){
+            char column = ASCII[letter - 32][i];
+            
+            for(j = 0; j <= 7; j++){
+                pixel = ((column >> j) & 0x01);
+                
+                if(pixel){
+                    LCD_drawPixel(x+i, y+j, print);
+                }
+                else if(!pixel){
+                    LCD_drawPixel(x+i, y+j, background);
+                }
+            }
+        }
+    }
+}
 
 // *****************************************************************************
 // *****************************************************************************
@@ -120,6 +199,39 @@ void APP_Initialize ( void )
     TRISAbits.TRISA4 = 0;
     LATAbits.LATA4 = 1;
     TRISBbits.TRISB4 = 1;
+    
+    initIMU();
+    
+    
+    LCD_init();
+    LCD_clearScreen(BLACK);
+    
+    i2c_master_start();             // check WHO_AM_I
+    i2c_master_send(0b11010110);    // write bit 0
+    i2c_master_send(0x0F);          // WHO_AM_I register
+    i2c_master_restart();
+    i2c_master_send(0b11010111);    // read bit 1
+    char read = i2c_master_recv();  // receive from slave
+    i2c_master_stop();
+    
+    if(read != 0b01101001){
+        LATAbits.LATA4 = 0;
+        while(1){ ; }               // black LCD if not done correctly
+    }
+    
+    int x,y,i,j = 0;
+	
+    for(x = 1; x <= 128; x++){
+        for(y = 77; y <= 83; y++){
+                LCD_drawPixel(x,y, BLUE);
+        }
+    }
+    
+    for(x = 61; x <= 67; x++){
+        for(y = 1; y <= 160; y++){
+                LCD_drawPixel(x,y, BLUE);
+        }
+    }
     
     /* TODO: Initialize your application's state machine and other
      * parameters.
@@ -166,6 +278,15 @@ void APP_Tasks ( void )
                 LATAINV = 0b10000;
             }
             */
+            
+            unsigned char address = 0b11010110;     // device opcode with write bit 0
+            unsigned char reg = 0x20;               // OUT_TEMP_L
+            int length = 14;                        // array length
+            unsigned char data[length];             // storage array
+            signed short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
+            short endX, endY;
+            char statusX[20], statusY[20];
+            int x,y,i,j = 0;
             
             if(PORTBbits.RB4 == 0){
                 LATAbits.LATA4 = 0;

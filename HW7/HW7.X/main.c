@@ -78,7 +78,7 @@ int main(void){
     LCD_init();
     LCD_clearScreen(BLACK);
     
-    //WHO_AM_I check
+    // WHO_AM_I check
     
     i2c_master_start();             // check WHO_AM_I
     i2c_master_send(0b11010110);    // write bit 0
