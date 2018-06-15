@@ -116,10 +116,11 @@ void APP_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */
     appData.state = APP_STATE_INIT;
-
+    
     TRISAbits.TRISA4 = 0;
     LATAbits.LATA4 = 1;
     TRISBbits.TRISB4 = 1;
+    
     /* TODO: Initialize your application's state machine and other
      * parameters.
      */
@@ -148,22 +149,94 @@ void APP_Tasks ( void )
         
             if (appInitialized)
             {
-            
-                appData.state = APP_STATE_SERVICE_TASKS;
+                appData.state = APP_STATE_SERVICE_TASKS;             
             }
             break;
         }
 
         case APP_STATE_SERVICE_TASKS:
         {
+            /*
             if(PORTBbits.RB4 == 0){
-                LATAbits.LATA4 = 0;
+                    LATAbits.LATA4 = 0;
             }
             else if(PORTBbits.RB4 == 1){
                 _CP0_SET_COUNT(0);
                 while(_CP0_GET_COUNT() < 12000){ ; }
                 LATAINV = 0b10000;
             }
+            */
+            
+            if(PORTBbits.RB4 == 0){
+                LATAbits.LATA4 = 0;
+            }
+            else if(PORTBbits.RB4 == 1){
+                _CP0_SET_COUNT(0);
+            
+                I2C_read_multiple(address, reg, data, length);
+            
+                temperature = (data[1] << 8) | (data[0] | 0b0000000000000000);  // if not, try (data[1] | 0b0000000000000000)
+                gyroX = (data[3] << 8) | (data[2] | 0b0000000000000000);
+                gyroY = (data[5] << 8) | (data[4] | 0b0000000000000000);
+                gyroZ = (data[7] << 8) | (data[6] | 0b0000000000000000);
+                accelX = (data[9] << 8) | (data[8] | 0b0000000000000000);
+                accelY = (data[11] << 8) | (data[10] | 0b0000000000000000);
+                accelZ = (data[13] << 8) | (data[12] | 0b0000000000000000);
+                
+                /*
+                sprintf(statusX,"x = %hi",accelX);
+                sprintf(statusY,"y = %hi",accelY);
+            
+                while(statusX[j]){                     // write word out
+                    printLetter(statusX[j], (5 + 5*j), 5, WHITE, BLACK);
+                    j++;
+                }
+            
+                j = 0;
+            
+                while(statusY[j]){                     // write word out
+                    printLetter(statusY[j], (5 + 5*j), 12, WHITE, BLACK);
+                    j++;
+                }
+            
+                j = 0;
+                */
+            
+                endX = 64 + (accelX/50);
+                endY = 80 + (accelY/100);
+            
+                for(x = 61; x <= 67; x++){
+                    for(y = 1; y <= 160; y++){
+                        if((y < endY && y > 80) || (y > endY && y < 80)){
+                            LCD_drawPixel(x,y, WHITE);
+                        }
+                        else{
+                            LCD_drawPixel(x,y, BLUE);
+                        }
+                    }
+                }
+            
+                for(y = 77; y <= 83; y++){
+                    for(x = 1; x <= 128; x++){
+                        if((x < endX && x > 64) || (x > endX && x < 64)){
+                            LCD_drawPixel(x,y, WHITE);
+                        }
+                        else{
+                            LCD_drawPixel(x,y, BLUE);
+                        }
+                    }
+                }
+            
+                for(x = 61; x <= 67; x++){
+                    for(y = 77; y <= 83; y++){
+                        LCD_drawPixel(x,y, WHITE);
+                    }
+                }
+            
+                while(_CP0_GET_COUNT() < 2400000){ ; }  // 20 Hz
+                LATAINV = 0b10000;
+            }
+            
             break;
         }
 
