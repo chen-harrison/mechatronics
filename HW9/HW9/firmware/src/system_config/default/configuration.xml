@@ -202,12 +202,12 @@
       <Template dnOrder="0">
         <Name dnOrder="0">sys_ports_static.c</Name>
         <Path dnOrder="1">Source&amp;#160;Files/app/system_config/default/framework/system/ports/src</Path>
-        <Checksum dnOrder="2">4AAD8F9C13EE87EED677C858E9122B61</Checksum>
+        <Checksum dnOrder="2">C7C5F12B6B72AE16A19616879948123F</Checksum>
       </Template>
       <Template dnOrder="1">
         <Name dnOrder="0">system_init.c</Name>
         <Path dnOrder="1">Source&amp;#160;Files/app/system_config/default</Path>
-        <Checksum dnOrder="2">C6B77ACF372676CE91601277D781BC4C</Checksum>
+        <Checksum dnOrder="2">B124694D7C67F741B722FFCEB08EC84A</Checksum>
       </Template>
       <Template dnOrder="2">
         <Name dnOrder="0">main.c</Name>
@@ -255,7 +255,7 @@
       <Template dnOrder="11">
         <Name dnOrder="0">system_config.h</Name>
         <Path dnOrder="1">Header&amp;#160;Files/app/system_config/default</Path>
-        <Checksum dnOrder="2">EDC148F870D9940B9FE481A6B730AB4C</Checksum>
+        <Checksum dnOrder="2">88F89F5A2EA2758DA42011757084115B</Checksum>
       </Template>
       <Template dnOrder="12">
         <Name dnOrder="0">app.h</Name>
