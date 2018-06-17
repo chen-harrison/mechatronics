@@ -94,6 +94,7 @@ int main(void){
     }
     
     int x,y,i,j = 0;
+	
     for(x = 1; x <= 128; x++){
         for(y = 77; y <= 83; y++){
                 LCD_drawPixel(x,y, BLUE);
