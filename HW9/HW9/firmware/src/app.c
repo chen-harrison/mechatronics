@@ -49,6 +49,8 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "app.h"
 #include <stdio.h>
 #include <xc.h>
+#include "ST7735.h"
+#include "i2c_master_noint.h"
 
 // *****************************************************************************
 // *****************************************************************************
@@ -59,7 +61,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 uint8_t APP_MAKE_BUFFER_DMA_READY dataOut[APP_READ_BUFFER_SIZE];
 uint8_t APP_MAKE_BUFFER_DMA_READY readBuffer[APP_READ_BUFFER_SIZE];
 int len, i = 0;
-int startTime = 0; // to remember the loop time
+// int startTime = 0; // to remember the loop time
 
 // *****************************************************************************
 /* Application Data
@@ -79,6 +81,63 @@ APP_DATA appData;
 // Section: Application Callback Functions
 // *****************************************************************************
 // *****************************************************************************
+
+void initIMU(void){
+    ANSELBbits.ANSB2 = 0;       // SDA2 pin is digital
+    ANSELBbits.ANSB3 = 0;       // SCL2 pin is digital
+    i2c_master_setup();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x10);          // CTRL1_XL address
+    i2c_master_send(0b10000010);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x11);          // CTRL2_G address
+    i2c_master_send(0b10001000);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x12);          // CTRL3_C address
+    i2c_master_send(0b00000100);    // info bit
+    i2c_master_stop();
+    
+    i2c_master_start();
+    i2c_master_send(0b11010110);    // IMU address, write bit 0
+    i2c_master_send(0x13);          // CTRL4_C address
+    i2c_master_send(0b10000000);    // info bit
+    i2c_master_stop();   
+}
+
+void I2C_read_multiple(unsigned char address, unsigned char reg, unsigned char * data, int length){
+    int i;
+    
+    // add the address with write bit 0, then when reading, OR it with 0b00000001
+    
+    i2c_master_start();
+    i2c_master_send(address);           // write bit 0
+    i2c_master_send(reg);               // OUT_TEMP_L
+    i2c_master_restart();
+    i2c_master_send(address | 0x01);    // read bit 1
+    
+    for(i = 0; i <= (length-1); i++){
+        
+        data[i] = i2c_master_recv();  // also can try *(data + 1)
+        
+        if(i < (length-1)){
+            i2c_master_ack(0);
+        }
+        else{
+            i2c_master_ack(1);
+            i2c_master_stop();
+        }
+    }
+}
+
+
 
 /* TODO:  Add any necessary callback functions.
  */
@@ -329,8 +388,45 @@ void APP_Initialize(void) {
     appData.readBuffer = &readBuffer[0];
 
     /* PUT YOUR LCD, IMU, AND PIN INITIALIZATIONS HERE */
+    
+    TRISAbits.TRISA4 = 0;
+    LATAbits.LATA4 = 1;
+    TRISBbits.TRISB4 = 1;
+    
+    initIMU();
+    
+    
+    LCD_init();
+    LCD_clearScreen(BLACK);
+    
+    i2c_master_start();             // check WHO_AM_I
+    i2c_master_send(0b11010110);    // write bit 0
+    i2c_master_send(0x0F);          // WHO_AM_I register
+    i2c_master_restart();
+    i2c_master_send(0b11010111);    // read bit 1
+    char read = i2c_master_recv();  // receive from slave
+    i2c_master_stop();
+    
+    if(read != 0b01101001){
+        LATAbits.LATA4 = 0;
+        while(1){ ; }               // black LCD if not done correctly
+    }
+    
+    int x,y,i,j = 0;
+	
+    for(x = 1; x <= 128; x++){
+        for(y = 77; y <= 83; y++){
+                LCD_drawPixel(x,y, BLUE);
+        }
+    }
+    
+    for(x = 61; x <= 67; x++){
+        for(y = 1; y <= 160; y++){
+                LCD_drawPixel(x,y, BLUE);
+        }
+    }
 
-    startTime = _CP0_GET_COUNT();
+    // startTime = _CP0_GET_COUNT();
 }
 
 /******************************************************************************
@@ -404,6 +500,7 @@ void APP_Tasks(void) {
             break;
 
         case APP_STATE_WAIT_FOR_READ_COMPLETE:
+            
         case APP_STATE_CHECK_TIMER:
 
             if (APP_StateReset()) {
@@ -414,7 +511,7 @@ void APP_Tasks(void) {
              * The isReadComplete flag gets updated in the CDC event handler. */
 
              /* WAIT FOR 5HZ TO PASS OR UNTIL A LETTER IS RECEIVED */
-            if (appData.isReadComplete || _CP0_GET_COUNT() - startTime > (48000000 / 2 / 5)) {
+            if (appData.isReadComplete && appData.readBuffer[0] == 'r') {
                 appData.state = APP_STATE_SCHEDULE_WRITE;
             }
 
@@ -431,28 +528,47 @@ void APP_Tasks(void) {
             /* Setup the write */
 
             appData.writeTransferHandle = USB_DEVICE_CDC_TRANSFER_HANDLE_INVALID;
-            appData.isWriteComplete = false;
+            // appData.isWriteComplete = false;
             appData.state = APP_STATE_WAIT_FOR_WRITE_COMPLETE;
+            
+            if(appData.isReadComplete){
+                int count = 0;
+                while (count < 100) {
+                    _CP0_SET_COUNT(0);
 
-            /* PUT THE TEXT YOU WANT TO SEND TO THE COMPUTER IN dataOut
-            AND REMEMBER THE NUMBER OF CHARACTERS IN len */
-            /* THIS IS WHERE YOU CAN READ YOUR IMU, PRINT TO THE LCD, ETC */
-            len = sprintf(dataOut, "%d\r\n", i);
-            i++; // increment the index so we see a change in the text
-            /* IF A LETTER WAS RECEIVED, ECHO IT BACK SO THE USER CAN SEE IT */
-            if (appData.isReadComplete) {
-                USB_DEVICE_CDC_Write(USB_DEVICE_CDC_INDEX_0,
-                        &appData.writeTransferHandle,
-                        appData.readBuffer, 1,
-                        USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
+                    appData.isWriteComplete = false;
+
+                    unsigned char address = 0b11010110; // device opcode with write bit 0
+                    unsigned char reg = 0x20; // OUT_TEMP_L
+                    int length = 14; // array length
+                    unsigned char data[length]; // storage array
+                    signed short temperature, gyroX, gyroY, gyroZ, accelX, accelY, accelZ;
+                    short endX, endY;
+                    char statusX[20], statusY[20];
+                    int x, y, i, j = 0;
+
+                    I2C_read_multiple(address, reg, data, length);
+
+                    temperature = (data[1] << 8) | (data[0] | 0b0000000000000000);
+                    gyroY = (data[5] << 8) | (data[4] | 0b0000000000000000);
+                    gyroZ = (data[7] << 8) | (data[6] | 0b0000000000000000);
+                    accelX = (data[9] << 8) | (data[8] | 0b0000000000000000);
+                    accelY = (data[11] << 8) | (data[10] | 0b0000000000000000);
+                    accelZ = (data[13] << 8) | (data[12] | 0b0000000000000000);
+
+                    len = sprintf(dataOut, "%d %d %d %d %d %d %d\r\n", (count + 1), accelX, accelY, accelZ, gyroX, gyroY, gyroZ);
+                    USB_DEVICE_CDC_Write(USB_DEVICE_CDC_INDEX_0,
+                            &appData.writeTransferHandle, dataOut, len,
+                            USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
+
+                    while (_CP0_GET_COUNT() < (48000000 / 2 / 100)) { ; } // 100 Hz
+                    LATAINV = 0b10000;
+                    count++;
+
+
+                }
             }
-            /* ELSE SEND THE MESSAGE YOU WANTED TO SEND */
-            else {
-                USB_DEVICE_CDC_Write(USB_DEVICE_CDC_INDEX_0,
-                        &appData.writeTransferHandle, dataOut, len,
-                        USB_DEVICE_CDC_TRANSFER_FLAGS_DATA_COMPLETE);
-                startTime = _CP0_GET_COUNT(); // reset the timer for acurate delays
-            }
+            
             break;
 
         case APP_STATE_WAIT_FOR_WRITE_COMPLETE:
